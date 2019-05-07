@@ -13803,7 +13803,8 @@ Both the Logistic Regression and the Gradient Boosting models have a consistent 
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <p><strong>Answer: </strong></p>
-<p>Imagine that we have 20 friends who have experience in census and also know how much money a job category tends to receive. For example, the first friend knows how much a teacher on average receives, the second friend knows how much a mechanic receives and so on. In Gradient Boosting we ask our friends to predict if each one of the persons in the census have an income bigger than 50K or not, then we collect these answers and, considering the expertise of each one, we choose the final answer.</p>
+<p>Imagine that we are the boss of 100 people that will be divided in 20 teams of 5 members each. We give them the census data to read and then they will have to answer about every person in the data, if someone makes more than 50K or not. Now, we need to maximize the correct answers. To do this, we build a process that goes as follows: First of all, any member can be a part of more than 1 team, any member can have more than 1 role in same team. The member which have maximum roles is the most important variable of our model. The  process starts with a random guess of answers. Then it calculates error that is if the person makes more than 50K compared with the predicted answer. Next step, it build a team of 5 members, which reduces the error by maximum. Again, it calculates the error. The second team has to reduce it further. But next team doesn't trust its previous partner fully, so it assume that answers are correct with certain probability. This process go on till 20 teams are build. So in the process, we have to decide, how many teams to build, members in each team and learning rate, so that error in the end is minimum.</p>
+<p><a href="https://www.quora.com/What-is-Gradient-Boosting-Models-and-Random-Forests-using-layman-terms">Reference</a></p>
 
 </div>
 </div>
@@ -14210,13 +14211,34 @@ If the time was a factor and with a bigget set (more individuals), I would defin
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
+<div class="prompt input_prompt">In&nbsp;[14]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!!</span>jupyter nbconvert *.ipynb
 </pre></div>
 
 </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt output_prompt">Out[14]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>[&#39;[NbConvertApp] Converting notebook finding_donors.ipynb to html&#39;,
+ &#39;[NbConvertApp] Writing 486572 bytes to finding_donors.html&#39;]</pre>
+</div>
+
+</div>
+
 </div>
 </div>
 
