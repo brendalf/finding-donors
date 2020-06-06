@@ -1,0 +1,244 @@
+# Applying Data Science for Social Good: Finding Donors for a Charity Company
+
+> A machine learning model to help a fictitious charity organization to identify possible donors with data collected from the U.S census.
+
+As a developer, the best way for me to learn a new programming language, framework or technology is by getting my hands dirty. Watching videos, reading the docs, making projects and increasing my [GitHub](https://github.com/obrendalf) portfolio. When I started my path on data science about a year ago, I didn't know how to apply what I was learning. Unlike before, there was something new, projects in data science requires data. It may seem obvious, but find real world data is the key for some projects.
+
+That's when I found Udacity nanodegree programs. At the time they were still operating in Brazil making the price more affordable. The proposal of the nanodegree is to be a complete course, with classes, exercises, online instructor, real world projects evaluated by professionals and career coach. There are nanodegrees and free courses on several topics and you can check the catalog [here](https://www.udacity.com/courses/all).  
+
+I decided to start a program and it was love at first sight. The classes, teachers and projects are amazing. Here, we're gonna take a look at the first project of the older seven months Udacity Data Scientist Nanodegree Program (The program was spitted into two new programs) and the purpose is develop a machine learning model to help a fictitious charity organization to identify possible donors with data collected from the U.S census. The Udacity also created a private Kaggle competition and the solution describe here is currently placed in top 9%.
+
+## Business Understanding
+
+CharityML is a fictitious charity organization and like the most of these organizations, survive from donations. They send letters to US residents asking for donations and after sending more than 30,000 letters, they determined that every donation received came from someone that was making more than $50,000 annually. So our goal is to build an machine learning model to best identify potential donors, expanding their base while reducing costs by sending letters only to the ones who would most likely donate.
+
+## Data Understanding
+
+```
+# Load the Census dataset
+data = pd.read_csv("census.csv")
+
+# Total number of records
+n_records = data.shape[0]
+
+# Print the results
+print("Total number of records: {}".format(n_records))
+```
+
+The modified census dataset consists of approximately 45,222 number of records, with each record having 14 columns. Let's take a look at these columns.
+
+> This dataset is a modified version of the dataset published in the paper ["Scaling Up the Accuracy of Naive-Bayes Classifiers: a Decision-Tree Hybrid"](https://www.aaai.org/Papers/KDD/1996/KDD96-033.pdf) by Ron Kohavi.
+
+```
+data.head()
+```  
+
+**Categorical Variables**
+* **workclass**: Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, Local-gov, State-gov, Without-pay, Never-worked. 
+* **education**: Bachelors, Some-college, 11th, HS-grad, Prof-school, Assoc-acdm, Assoc-voc, 9th, 7th-8th, 12th, Masters, 1st-4th, 10th, Doctorate, 5th-6th, Preschool.
+* **marital-status**: Married-civ-spouse, Divorced, Never-married, Separated, Widowed, Married-spouse-absent, Married-AF-spouse. 
+* **occupation**: Tech-support, Craft-repair, Other-service, Sales, Exec-managerial, Prof-specialty, Handlers-cleaners, Machine-op-inspct, Adm-clerical, Farming-fishing, Transport-moving, Priv-house-serv, Protective-serv, Armed-Forces. 
+* **relationship**: Wife, Own-child, Husband, Not-in-family, Other-relative, Unmarried. 
+* **race**: Black, White, Asian-Pac-Islander, Amer-Indian-Eskimo, Other. 
+* **sex**: Female, Male. 
+* **native-country**: United-States, Cambodia, England, Puerto-Rico, Canada, Germany, Outlying-US(Guam-USVI-etc), India, Japan, Greece, South, China, Cuba, Iran, Honduras, Philippines, Italy, Poland, Jamaica, Vietnam, Mexico, Portugal, Ireland, France, Dominican-Republic, Laos, Ecuador, Taiwan, Haiti, Columbia, Hungary, Guatemala, Nicaragua, Scotland, Thailand, Yugoslavia, El-Salvador, Trinadad&Tobago, Peru, Hong, Holand-Netherlands.
+
+**Continuous Variables**
+* **age**: Age.
+* **education-num**: Number of educational years completed.
+* **capital-gain**: Monetary Capital Gains.
+* **capital-loss**: Monetary Capital Losses.
+* **hours-per-week**: Average Hours Per Week Worked.
+
+```
+data.describe()
+```
+
+Notice that `capital-gain` and `capital-loss` is highly-skewed. We're gonna fix these features later.
+
+**Target**
+
+<!-- Plot target distribution -->
+
+```
+# Number of records where individual's income is more than $50,000
+n_greater_50k = data[data['income'] == '>50K'].shape[0]
+
+# Number of records where individual's income is at most $50,000
+n_at_most_50k = data[data['income'] == '<=50K'].shape[0]
+
+# Percentage of individuals whose income is more than $50,000
+greater_percent = (n_greater_50k / n_records) * 100
+
+print("Individuals making more than $50,000: {}".format(n_greater_50k))
+print("Individuals making at most $50,000: {}".format(n_at_most_50k))
+print("Percentage of individuals making more than $50,000: {:.2f}%".format(greater_percent))
+```
+
+Looking at the distribution of classes (those who make at most `$50,000`, and those who make more), it's clear most individuals do not make more than `$50,000`. This can greatly affect accuracy, since we could simply say "this person does not make more than `$50,000`" and generally be right, without ever looking at the data! Making such a statement would be called naive, since we have not considered any information to substantiate the claim.
+
+We need to convert the target `income` to numerical values (we're gonna explain why later). Since there are only two possible categories for the target ("<=50K" and ">50K"), we can simply encode these two categories as 0 and 1, respectively.
+
+```
+# Encode the 'income' data to numerical values
+data.income = data.income.replace(to_replace=['<=50K', '>50K'], value=[0, 1])
+```
+
+### Early Data Analysis
+Now it's time to First, let's take a closer look in the distributions and correlations with the target for each feature. This is a good place to make questions/hypotheses about the problem and use visualizations to answer it.
+
+#### Question 1: People with a higher education are more likely to have bigger annually income?
+The `education_level` is categorical and has a notion of ranked associated. For example, we can think that bachelors, masters and doctors are more likely to have a bigger annually income than people that didn't make through collage. Is this hypotheses true? 
+
+In fact, the `education-num` is a numeric ranked transformation applied to the values of `education_level`. 
+
+Grouping by `education_level` and calculating the percentage of each level that earns more than 50,000 annually, we obtain the following chart:
+
+Our hypothesis is almost there, it has just a few wrong ranked `education-level`, perhaps because of some data noise. Notice that the elementary ranked school years are pretty messy and `Prof-school` has a higher chance of earning 50,000 annually but is a lower level than `Doctorate`.
+
+We'll not use the `education-num` feature because it can mislead our model into thinking that people who have spent more years in a classroom are more important to the target. But this statement is not true, as we saw in the graph above.
+
+#### Question 2: People that works more hours per week are more likely to have bigger annually income? 
+In our dataset we have the `hours-per-week` feature that represents how many hours each Census participant works per week. Let's check out if more someone works per week, more likely it's to have a bigger annually income. 
+
+At first sight, looking at the mean of each `income` class, it appears that people in ">50k" group in fact works more hours per week than the other group. Diving a little deep, the image below shows the average of people that makes more than 50k annually distributed by hours worked per week.
+
+The orange line shows the mean worked hours in the entire dataset. The average increases the forty hours worked per week (red bar). We have a few hours without bar because we don't have reports with to those.   
+
+#### Question 3: How is age is related to our target?
+Answer
+
+
+## Preparing the Data
+Before data can be used as input for machine learning algorithms, it often must be cleaned, formatted, and restructured — this is typically known as preprocessing. Fortunately, for this dataset, there are no invalid or missing entries we must deal with, however, there are some qualities about certain features that must be adjusted. This preprocessing can help tremendously with the outcome and predictive power of nearly all learning algorithms.
+
+```
+data.isna().sum()
+```
+
+### Transforming Skewed Continuous Features
+A dataset may sometimes contain at least one feature whose values tend to lie near a single number, but will also have a non-trivial number of vastly larger or smaller values than that single number. Algorithms can be sensitive to such distributions of values and can underperform if the range is not properly normalized. With the census dataset two features fit this description: `capital-gain` and `capital-loss`.
+
+For highly-skewed feature distributions like these, it is common practice to apply a logarithmic transformation on the data so that the very large and very small values do not negatively affect the performance of a learning algorithm. Using a logarithmic transformation significantly reduces the range of values caused by outliers. Care must be taken when applying this transformation however: The logarithm of 0 is undefined, so we must translate the values by a small amount above 0 to apply the the logarithm successfully.
+
+### Normalizing Numerical Features
+In addition to performing transformations on features that are highly skewed, it is often good practice to perform some type of scaling on numerical features. Applying a scaling to the data does not change the shape of each feature's distribution (such as `'capital-gain'` or `'capital-loss'` above); however, normalization ensures that each feature is treated equally when applying supervised learners. Note that once scaling is applied, observing the data in its raw form will no longer have the same original meaning, as exampled below.
+
+We will use [`sklearn.preprocessing.MinMaxScaler`](http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html) for this.
+
+### One Hot Encoding
+Typically, learning algorithms expect input to be numeric, which requires that non-numeric features (categorical variables) be converted. One popular way to convert these variables is by using the one-hot encoding scheme. One-hot encoding creates a "dummy" variable for each possible category variable. For example, assume `someFeature` has three possible entries: A, B, or C. We then encode this feature into `someFeature_A`, `someFeature_B` and `someFeature_C`.
+
+|   | someFeature |                        | someFeature_A | someFeature_B | someFeature_C |
+|---|-------------|------------------------|---------------|---------------|---------------|
+| 0 |      B      |                        |       0       |       1       |       0       |
+| 1 |      C      | --> one-hot encode --> |       0       |       0       |       1       |
+| 2 |      A      |                        |       1       |       0       |       0       |
+
+
+```
+# One-hot encode the 'features_log_minmax_transform' data using pandas.get_dummies()
+features_final = pd.get_dummies(data=features_log_minmax_transform)
+
+# Print the number of features after one-hot encoding
+encoded = list(features_final.columns)
+print("{} total features after one-hot encoding.".format(len(encoded)))
+```
+
+### Splitting Data in Training and Validation
+We won't extend this data preparation much, so if you want to see the rest of the code, check out my [github](https://github.com/brendalf/finding-donors).
+
+Now that all categorical variables have been converted into numerical features, and all numerical features have been normalized, we're going to split our `data` into two sets: training and validation.
+<!-- Explain why this is necessary -->
+
+```
+# Import train_test_split
+from sklearn.model_selection import train_test_split
+
+# Split the 'features' and 'income' data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(features_final, 
+                                                    income, 
+                                                    test_size = 0.2, 
+                                                    random_state = 0)
+
+# Show the results of the split
+print("Training set has {} samples.".format(X_train.shape[0]))
+print("Testing set has {} samples.".format(X_test.shape[0]))
+```
+
+## Data Modeling
+In this section, we will investigate a couple different algorithms and determine which is best at modeling the data. For now, we'll use accuracy and cross validation with `k_fold = 5`. After choosing the best model, we'll explain the algorithm, look at the most important features and build a machine learning pipeline.
+
+You can learn more about cross validation [here](https://towardsdatascience.com/cross-validation-explained-evaluating-estimator-performance-e51e5430ff85).
+
+### Models Exploration  
+
+* **Random Forest** has the best score in the training set, but it's clearly over fitting.
+* **XGBoost** has the best score in the validation set and the lowest standard deviation across folds.
+* **Ridge** and **Linear Discriminant Analysis** are the fastest models to train and have good overall performances.
+* **GaussianNB** has the lowest performance, but it's always important to consider a naive prediction as benchmark for whether a model is performing well. 
+
+With that in mind, we'll choose the **XGBoost** as best model for this problem and perform a few further investigations.
+
+> If our dataset was bigger and time to train was important, we could use **Rigde** or **Linear Discriminant Analysis**.
+
+### XGBoost
+The XGBoost (e**X**treme **G**radient **Boost**ing) basically generates a number of decision trees in sequence where the objective of the next tree is to reduce the error from the previous one.  
+We'll not explain how the model exacly works because isn't the main point here and we have many articles here on Medium for that, for instance, if you want to learn more about how the XGBoost exacly works, you have this great article [here](https://towardsdatascience.com/xgboost-mathematics-explained-58262530904a).
+
+### Feature Importances
+<!-- Looking at features importance -->
+
+### ML Pipeline
+<!-- Building a pipeline -->
+
+
+## Evaluating the Results
+
+**CharityML**, equipped with their research, knows individuals that make more than `$50,000` are most likely to donate to their charity. Because of this, **CharityML** is particularly interested in predicting who makes more than `$50,000` accurately. It would seem that using accuracy as a metric for evaluating a particular model's performance would be appropriate. Additionally, identifying someone that does not make more than `$50,000` as someone who does would be detrimental to **CharityML**, since they are looking to find individuals willing to donate. Therefore, a model's ability to precisely predict those that make more than `$50,000` is more important than the model's ability to recall those individuals. We can use F-beta score as a metric that considers both precision and recall:
+
+\\[ F_{\beta} = (1 + \beta^2) \cdot \frac{precision \cdot recall}{\left( \beta^2 \cdot precision \right) + recall} \\].
+ 
+In particular, when  `β=0.5`, more emphasis is placed on precision.
+
+### Metrics
+Just a little overview about metrics:
+
+**Accuracy** measures how often the classifier makes the correct prediction. It’s the ratio of the number of correct predictions to the total number of predictions (the number of test data points).
+
+**Precision** tells us what proportion of messages we classified as spam, actually were spam. It is a ratio of true positives(words classified as spam, and which are actually spam) to all positives(all words classified as spam, irrespective of whether that was the correct classification), in other words it is the ratio of
+
+`[True Positives/(True Positives + False Positives)]`
+
+**Recall** (sensitivity) tells us what proportion of messages that actually were spam were classified by us as spam. It is a ratio of true positives(words classified as spam, and which are actually spam) to all the words that were actually spam, in other words it is the ratio of
+
+`[True Positives/(True Positives + False Negatives)]`
+
+If you want to learn more about classification metrics, take a look at this post: [The ultimate guide to binary classification metrics](https://towardsdatascience.com/the-ultimate-guide-to-binary-classification-metrics-c25c3627dd0a).
+
+### Optimizing the Model
+<!-- Hyper-parameter optimization -->
+
+## Deploying
+<!-- Talk about how this model could have been deployed -->
+<!-- Talk about submitting the results to Kaggle -->
+	<!-- Read the test set -->
+	<!-- Check for null values -->
+	<!-- Use pipeline to predict -->
+<!-- Talk about why I didn't look at the test set variables and distributions -->
+
+## Final Worlds
+Thank you for reading it. I hope that you have found this a good example on how to apply data science for social good. I also like to say thanks to @AmandaFerraboli for reviewing this post.  
+Feel free to comment below any questions or feedback. You can also find me on [Kaggle](https://kaggle.com/brendalf), [GitHub](https://github.com/brendalf) or [Linkedin](https://linkedin.com/brendalf).
+
+Last but not least, I like to say #stayhome and if you could, take a little time to sponsor any of these Brazilian charity organizations:
+
+**ChildFundBrazil**
+"Since 1966 in the country, ChildFund Brazil, the International Agency for Child Development, has benefited thousands of people, including children, adolescents, young people and their families."
+
+Donate [here](https://www.childfundbrasil.org.br/doe-agora/).
+
+**SOS Mata Atlântica**
+"It acts in the promotion of public policies for the conservation of the Atlantic Forest through the monitoring of the biome, the production of studies, demonstration projects, dialogue with public and private sectors, the improvement of environmental legislation, communication and the engagement of society."
+
+Donate [here](https://www.sosma.org.br/doacao/).	
